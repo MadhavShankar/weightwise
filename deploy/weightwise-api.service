@@ -1,0 +1,20 @@
+[Unit]
+Description=WeightWise FastAPI backend
+After=network.target
+
+[Service]
+Type=simple
+User=weightwise
+WorkingDirectory=/opt/weightwise
+ExecStart=/opt/weightwise/venv/bin/gunicorn web_api.main:app \
+    -k uvicorn.workers.UvicornWorker \
+    -w 2 \
+    --bind 127.0.0.1:8000 \
+    --timeout 120 \
+    --keep-alive 5
+Restart=always
+RestartSec=5
+EnvironmentFile=/opt/weightwise/.env
+
+[Install]
+WantedBy=multi-user.target

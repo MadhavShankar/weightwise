@@ -1,6 +1,6 @@
 import logging
 
-from telegram import ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
+from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove, Update
 from telegram.ext import (
     CommandHandler,
     ContextTypes,
@@ -13,7 +13,13 @@ from services import calculator, database
 
 logger = logging.getLogger(__name__)
 
-ASK_NAME, ASK_AGE, ASK_GENDER, ASK_HEIGHT, ASK_WEIGHT, ASK_TARGET_WEIGHT, ASK_ACTIVITY, ASK_DIET, ASK_MEDICAL = range(9)
+ASK_NAME, ASK_AGE, ASK_GENDER, ASK_HEIGHT, ASK_WEIGHT, ASK_TARGET_WEIGHT, ASK_ACTIVITY, ASK_DIET, ASK_MEDICAL, ASK_PHONE = range(10)
+
+_PHONE_KB = ReplyKeyboardMarkup(
+    [[KeyboardButton("📱 Share My Phone Number", request_contact=True)]],
+    one_time_keyboard=True,
+    resize_keyboard=True,
+)
 
 _GENDER_KB = ReplyKeyboardMarkup([["Male", "Female"]], one_time_keyboard=True, resize_keyboard=True)
 _ACTIVITY_KB = ReplyKeyboardMarkup([["Sedentary", "Light", "Moderate", "Active"]], one_time_keyboard=True, resize_keyboard=True)
@@ -166,13 +172,38 @@ async def _ask_medical(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     })
 
     logger.info("New user created: telegram_id=%s calorie_target=%s", telegram_id, calorie_target)
+    data["calorie_target"] = calorie_target
+    data["macros"] = macros
+
+    await update.message.reply_text(
+        f"Almost done! One last step — share your phone number to enable "
+        f"the WeightWise mobile app and keep your data in sync across devices.",
+        reply_markup=_PHONE_KB,
+    )
+    return ASK_PHONE
+
+
+async def _save_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    telegram_id = update.effective_user.id
+    data = context.user_data
+    contact = update.message.contact
+
+    if contact and contact.user_id == telegram_id:
+        phone = contact.phone_number
+        if not phone.startswith('+'):
+            phone = '+' + phone
+        database.update_user(telegram_id, {"phone_number": phone})
+        logger.info("Phone saved telegram_id=%s", telegram_id)
+
+    calorie_target = data.get("calorie_target", 0)
+    macros = data.get("macros", {})
 
     await update.message.reply_text(
         f"All set, {data['name']}! Here's your daily plan:\n\n"
         f"Calorie target: {calorie_target} kcal\n"
-        f"Protein: {macros['protein_g']}g\n"
-        f"Carbs: {macros['carbs_g']}g\n"
-        f"Fat: {macros['fat_g']}g",
+        f"Protein: {macros.get('protein_g', 0)}g\n"
+        f"Carbs: {macros.get('carbs_g', 0)}g\n"
+        f"Fat: {macros.get('fat_g', 0)}g",
         reply_markup=ReplyKeyboardRemove(),
     )
     await update.message.reply_text(
@@ -223,6 +254,41 @@ async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     return ConversationHandler.END
 
 
+# /sharephone command for already-onboarded users
+async def _sharephone_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    telegram_id = update.effective_user.id
+    user = database.get_user(telegram_id)
+    if not user:
+        await update.message.reply_text("Please complete setup first with /start.")
+        return ConversationHandler.END
+    if user.get("phone_number"):
+        await update.message.reply_text("Your phone number is already linked.")
+        return ConversationHandler.END
+    await update.message.reply_text(
+        "Share your phone number to enable the WeightWise mobile app.",
+        reply_markup=_PHONE_KB,
+    )
+    return ASK_PHONE
+
+
+async def _sharephone_save(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    telegram_id = update.effective_user.id
+    contact = update.message.contact
+    if contact and contact.user_id == telegram_id:
+        phone = contact.phone_number
+        if not phone.startswith('+'):
+            phone = '+' + phone
+        database.update_user(telegram_id, {"phone_number": phone})
+        logger.info("Phone saved via /sharephone telegram_id=%s", telegram_id)
+        await update.message.reply_text(
+            "Done! Your phone is now linked. Sign into the WeightWise app with this number to access all your data.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+    else:
+        await update.message.reply_text("Could not verify contact. Please try again.", reply_markup=ReplyKeyboardRemove())
+    return ConversationHandler.END
+
+
 start_conversation = ConversationHandler(
     entry_points=[CommandHandler("start", _start)],
     states={
@@ -235,6 +301,15 @@ start_conversation = ConversationHandler(
         ASK_ACTIVITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, _ask_activity)],
         ASK_DIET: [MessageHandler(filters.TEXT & ~filters.COMMAND, _ask_diet)],
         ASK_MEDICAL: [MessageHandler(filters.TEXT & ~filters.COMMAND, _ask_medical)],
+        ASK_PHONE: [MessageHandler(filters.CONTACT, _save_phone)],
+    },
+    fallbacks=[CommandHandler("cancel", _cancel)],
+)
+
+sharephone_conversation = ConversationHandler(
+    entry_points=[CommandHandler("sharephone", _sharephone_start)],
+    states={
+        ASK_PHONE: [MessageHandler(filters.CONTACT, _sharephone_save)],
     },
     fallbacks=[CommandHandler("cancel", _cancel)],
 )

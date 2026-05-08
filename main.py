@@ -22,7 +22,7 @@ from handlers.plan import plan_handler
 from handlers.report import report_handler
 from handlers.restaurant import restaurant_handler
 from handlers.settings import pause_handler, resume_handler
-from handlers.start import start_conversation
+from handlers.start import start_conversation, sharephone_conversation
 from handlers.tests import tests_handler
 from handlers.water import water_handler
 from handlers.weight import weight_handler
@@ -107,6 +107,7 @@ def main() -> None:
     )
 
     app.add_handler(start_conversation)
+    app.add_handler(sharephone_conversation)
 
     # Document and photo handlers — order matters: specific before general
     app.add_handler(MessageHandler(filters.Document.PDF, report_handler))
