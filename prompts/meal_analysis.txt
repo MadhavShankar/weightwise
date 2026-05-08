@@ -14,8 +14,10 @@ User context:
 - Daily calorie target: {calorie_target} kcal
 
 Rules:
-- Use realistic portion estimates based on visual cues (plate size, utensils, food density)
-- If a food is unclear, state the most likely option
+- Estimate portions carefully using ALL visible cues: plate/bowl diameter, utensil size, food height/thickness, and relative food density
+- A standard dinner plate is ~26cm; a bowl is ~400-500ml; a handful is ~30-40g for most foods
+- Always give a specific gram or volume estimate — never say "some" or "a portion"
+- If a food is ambiguous, state the most likely option and note it
 - The Tip must be specific to what you see, not generic advice
 - Max 180 words total output
 - No extra commentary outside the format above

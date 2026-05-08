@@ -142,6 +142,19 @@ def recommend_lab_tests(user_profile: dict) -> str:
     return response.text
 
 
+def correct_meal_analysis(original_analysis: str, correction: str, user_profile: dict) -> str:
+    system = _load_prompt("meal_correction.txt").format(
+        calorie_target=user_profile.get("calorie_target", 2000),
+        today_calories=user_profile.get("today_calories", 0),
+    )
+    model = _get_model(system)
+    response = model.generate_content(
+        contents=f"Original analysis:\n{original_analysis}\n\nUser correction: {correction}",
+        generation_config={"max_output_tokens": 400},
+    )
+    return response.text
+
+
 def chat_response(user_message: str, user_profile: dict) -> str:
     system = (
         f"You are a concise weight-loss coach. "

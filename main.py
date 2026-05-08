@@ -13,7 +13,7 @@ from telegram.ext import (
     filters,
 )
 
-from handlers.meal_log import log_handler, log_command_handler, photo_meal_handler
+from handlers.meal_log import log_handler, log_command_handler, photo_meal_handler, meal_correction_handler
 from handlers.meal_plan import meal_plan_handler
 from handlers.plan import plan_handler
 from handlers.report import report_handler
@@ -45,7 +45,9 @@ async def photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 async def smart_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text or ""
-    if _RESTAURANT_RE.search(text):
+    if context.user_data.get("last_meal_id"):
+        await meal_correction_handler(update, context)
+    elif _RESTAURANT_RE.search(text):
         await restaurant_handler(update, context)
     else:
         await log_handler(update, context)

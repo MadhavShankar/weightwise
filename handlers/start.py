@@ -170,9 +170,29 @@ async def _ask_medical(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         f"Calorie target: {calorie_target} kcal\n"
         f"Protein: {macros['protein_g']}g\n"
         f"Carbs: {macros['carbs_g']}g\n"
-        f"Fat: {macros['fat_g']}g\n\n"
-        "Just send me what you eat and I'll track it!",
+        f"Fat: {macros['fat_g']}g",
         reply_markup=ReplyKeyboardRemove(),
+    )
+    await update.message.reply_text(
+        "Here is what I can do for you:\n\n"
+        "Log meals\n"
+        "  - Send a photo of your food — I'll identify it and calculate calories\n"
+        "  - Type what you ate (e.g. '2 eggs and toast') — I'll log it\n"
+        "  - /log <meal> — log a specific meal by name\n\n"
+        "Meal correction\n"
+        "  - After a photo analysis, reply with a correction (e.g. 'actually 2 cups of rice') and I'll update the entry\n\n"
+        "Plans & recommendations\n"
+        "  - /plan — personalised weight-loss plan based on your profile\n"
+        "  - /mealplan — 7-day meal plan within your calorie target\n"
+        "  - /tests — personalised blood test recommendations\n\n"
+        "Lab reports\n"
+        "  - Send a photo or PDF of your lab report — I'll analyse the markers\n\n"
+        "Eating out\n"
+        "  - /restaurant <place> — healthy choices and what to avoid at a specific restaurant\n"
+        "  - Or just tell me (e.g. 'eating out at Pizza Hut')\n\n"
+        "Notifications\n"
+        "  - /pause — pause daily check-in reminders\n"
+        "  - /resume — turn them back on"
     )
     context.user_data.clear()
     return ConversationHandler.END

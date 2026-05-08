@@ -39,15 +39,45 @@ async def photo_meal_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     response = ai.analyze_meal_photo(image_bytes, profile_with_today)
 
     calories = _parse_calories(response)
-    database.log_meal(
+    meal_id = database.log_meal(
         telegram_id=telegram_id,
         description=update.message.caption or "Photo meal",
         calories=calories,
         meal_data={"ai_response": response, "calories": calories},
     )
 
-    await update.message.reply_text(response)
+    context.user_data["last_meal_id"] = meal_id
+    context.user_data["last_meal_analysis"] = response
+    context.user_data["last_meal_today_calories"] = today_calories
+
+    await update.message.reply_text(
+        f"{response}\n\nPortion size wrong? Just reply with the correction (e.g. 'actually 2 cups of rice, not 1')."
+    )
     logger.info("Logged meal for user %d: %d kcal", telegram_id, calories)
+
+
+async def meal_correction_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    telegram_id = update.effective_user.id
+    user_profile = database.get_user(telegram_id)
+    if not user_profile:
+        await update.message.reply_text("Please run /start first to set up your profile.")
+        return
+
+    correction = update.message.text or ""
+    meal_id = context.user_data.pop("last_meal_id", None)
+    original_analysis = context.user_data.pop("last_meal_analysis", "")
+    today_calories = context.user_data.pop("last_meal_today_calories", 0)
+
+    profile_with_today = {**user_profile, "today_calories": today_calories}
+
+    response = ai.correct_meal_analysis(original_analysis, correction, profile_with_today)
+    new_calories = _parse_calories(response)
+
+    if meal_id:
+        database.update_meal(meal_id, new_calories, {"ai_response": response, "calories": new_calories})
+
+    await update.message.reply_text(f"Updated!\n\n{response}")
+    logger.info("Corrected meal %s for user %d: %d kcal", meal_id, telegram_id, new_calories)
 
 
 async def log_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

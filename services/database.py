@@ -50,9 +50,9 @@ def log_meal(
     description: str,
     calories: int,
     meal_data: dict,
-) -> None:
+) -> int:
     client = _get_client()
-    client.table("meal_logs").insert(
+    result = client.table("meal_logs").insert(
         {
             "telegram_id": telegram_id,
             "description": description,
@@ -61,6 +61,14 @@ def log_meal(
             "logged_at": datetime.now(timezone.utc).isoformat(),
         }
     ).execute()
+    return result.data[0]["id"]
+
+
+def update_meal(meal_id: int, calories: int, meal_data: dict) -> None:
+    client = _get_client()
+    client.table("meal_logs").update(
+        {"calories": calories, "meal_data": meal_data}
+    ).eq("id", meal_id).execute()
 
 
 def get_today_calories(telegram_id: int) -> int:
