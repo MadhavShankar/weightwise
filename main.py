@@ -13,6 +13,8 @@ from telegram.ext import (
     filters,
 )
 
+from handlers.coach import coach_handler
+from handlers.exercise import exercise_handler
 from handlers.meal_log import log_handler, log_command_handler, photo_meal_handler, meal_correction_handler
 from handlers.meal_plan import meal_plan_handler
 from handlers.plan import plan_handler
@@ -21,6 +23,8 @@ from handlers.restaurant import restaurant_handler
 from handlers.settings import pause_handler, resume_handler
 from handlers.start import start_conversation
 from handlers.tests import tests_handler
+from handlers.water import water_handler
+from handlers.weight import weight_handler
 from services.scheduler import setup_scheduler, shutdown_scheduler
 
 load_dotenv()
@@ -30,6 +34,18 @@ logging.basicConfig(
     level=logging.INFO,
 )
 
+_EXERCISE_RE = re.compile(
+    r"(?i)\b(ran|run|walk|walked|workout|gym|yoga|cycl|swim|jog|exercise|hiit|cardio|played|training|trained|steps)\b"
+)
+_WATER_RE = re.compile(
+    r"(?i)\b(water|glass|litre|liter|ml|hydrat|drank|drink)\b"
+)
+_WEIGHT_RE = re.compile(
+    r"(?i)(i weigh|my weight|weighed|stepped on|scale|kg today)"
+)
+_MED_RE = re.compile(
+    r"(?i)(took my|had my.*(pill|med|tablet)|took.*(mg|metformin|medicine))"
+)
 _RESTAURANT_RE = re.compile(
     r"(?i)(eating out|eating at|restaurant|cafe|going to\b)", re.IGNORECASE
 )
@@ -43,14 +59,36 @@ async def photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await photo_meal_handler(update, context)
 
 
+async def _log_medication(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    from services import database
+    telegram_id = update.effective_user.id
+    user_profile = database.get_user(telegram_id)
+    if not user_profile:
+        await update.message.reply_text("Please run /start first to set up your profile.")
+        return
+    text = update.message.text or ""
+    database.log_medication(telegram_id=telegram_id, medication_name=text)
+    name = user_profile.get("name", "")
+    await update.message.reply_text(f"Got it, {name} — logged your medication.")
+
+
 async def smart_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text or ""
+
     if context.user_data.get("last_meal_id"):
         await meal_correction_handler(update, context)
+    elif _WEIGHT_RE.search(text):
+        await weight_handler(update, context)
+    elif _EXERCISE_RE.search(text):
+        await exercise_handler(update, context)
+    elif _WATER_RE.search(text):
+        await water_handler(update, context)
+    elif _MED_RE.search(text):
+        await _log_medication(update, context)
     elif _RESTAURANT_RE.search(text):
         await restaurant_handler(update, context)
     else:
-        await log_handler(update, context)
+        await coach_handler(update, context)
 
 
 async def adjust_plan_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -88,6 +126,9 @@ def main() -> None:
 
     # Command handlers
     app.add_handler(CommandHandler("log", log_command_handler))
+    app.add_handler(CommandHandler("exercise", exercise_handler))
+    app.add_handler(CommandHandler("water", water_handler))
+    app.add_handler(CommandHandler("weight", weight_handler))
     app.add_handler(CommandHandler("report", report_handler))
     app.add_handler(CommandHandler("plan", plan_handler))
     app.add_handler(CommandHandler("mealplan", meal_plan_handler))
@@ -99,7 +140,7 @@ def main() -> None:
     # Inline keyboard callbacks
     app.add_handler(CallbackQueryHandler(adjust_plan_callback, pattern="^adjust_plan_"))
 
-    # Free-text fallback — routes to restaurant or general chat
+    # Free-text fallback — smart router handles intent detection
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, smart_router))
 
     app.run_polling()

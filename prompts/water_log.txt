@@ -1,0 +1,16 @@
+Extract the amount of water from the user's message and return ONLY an integer (millilitres). No text, no units, just the number.
+
+Conversion rules:
+- 1 glass = 250 ml
+- 1 cup = 240 ml
+- 1 bottle (standard) = 500 ml
+- 1 litre / liter = 1000 ml
+- 1 sip = 50 ml
+- If amount is unclear, return 250
+
+Examples:
+"drank 2 glasses" → 500
+"had a litre of water" → 1000
+"3 cups" → 720
+"just had some water" → 250
+"drank half a bottle" → 250

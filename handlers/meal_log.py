@@ -11,6 +11,16 @@ logger = logging.getLogger(__name__)
 _CALORIES_RE = re.compile(r"Calories:\s*(\d+)")
 
 
+def _coaching_line(name: str, calorie_target: int, today_calories_before: int, meal_calories: int) -> str:
+    total = today_calories_before + meal_calories
+    remaining = calorie_target - total
+    if remaining >= 400:
+        return f"You're doing great today, {name}. {remaining} kcal still in your budget — make it count."
+    if remaining >= 0:
+        return f"Getting close to your limit, {name}. {remaining} kcal left — keep dinner light."
+    return f"{name}, you're {abs(remaining)} kcal over today. Tomorrow we reset — I'll be watching."
+
+
 def _parse_calories(response: str) -> int:
     match = _CALORIES_RE.search(response)
     if match:
@@ -50,8 +60,14 @@ async def photo_meal_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data["last_meal_analysis"] = response
     context.user_data["last_meal_today_calories"] = today_calories
 
+    coaching = _coaching_line(
+        user_profile.get("name", ""),
+        user_profile.get("calorie_target", 2000),
+        today_calories,
+        calories,
+    )
     await update.message.reply_text(
-        f"{response}\n\nPortion size wrong? Just reply with the correction (e.g. 'actually 2 cups of rice, not 1')."
+        f"{response}\n\n{coaching}\n\nPortion size wrong? Just reply with the correction (e.g. 'actually 2 cups of rice, not 1')."
     )
     logger.info("Logged meal for user %d: %d kcal", telegram_id, calories)
 
@@ -104,7 +120,13 @@ async def log_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         meal_data={"ai_response": response, "calories": calories},
     )
 
-    await update.message.reply_text(response)
+    coaching = _coaching_line(
+        user_profile.get("name", ""),
+        user_profile.get("calorie_target", 2000),
+        today_calories,
+        calories,
+    )
+    await update.message.reply_text(f"{response}\n\n{coaching}")
     logger.info("Logged text meal for user %d: %d kcal", telegram_id, calories)
 
 
@@ -137,5 +159,11 @@ async def log_command_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         meal_data={"ai_response": response, "calories": calories},
     )
 
-    await update.message.reply_text(response)
+    coaching = _coaching_line(
+        user_profile.get("name", ""),
+        user_profile.get("calorie_target", 2000),
+        today_calories,
+        calories,
+    )
+    await update.message.reply_text(f"{response}\n\n{coaching}")
     logger.info("Logged text meal for user %d: %d kcal", telegram_id, calories)

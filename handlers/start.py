@@ -161,6 +161,8 @@ async def _ask_medical(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         "medical_conditions": data["medical_conditions"],
         "calorie_target": calorie_target,
         "onboarding_complete": True,
+        "current_streak": 0,
+        "longest_streak": 0,
     })
 
     logger.info("New user created: telegram_id=%s calorie_target=%s", telegram_id, calorie_target)
@@ -181,6 +183,17 @@ async def _ask_medical(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         "  - /log <meal> — log a specific meal by name\n\n"
         "Meal correction\n"
         "  - After a photo analysis, reply with a correction (e.g. 'actually 2 cups of rice') and I'll update the entry\n\n"
+        "Exercise tracking\n"
+        "  - /exercise <description> — log exercise and get calories burned\n"
+        "  - Or just tell me (e.g. 'went for a 30 min run')\n\n"
+        "Water tracking\n"
+        "  - /water <amount> — log water intake (e.g. '2 glasses', '500ml')\n"
+        "  - Or just tell me (e.g. 'drank 3 glasses of water')\n\n"
+        "Weight logging\n"
+        "  - /weight <kg> — log your current weight and track progress\n"
+        "  - Or just tell me (e.g. 'I weigh 75.5 today')\n\n"
+        "Medication\n"
+        "  - Tell me when you take medication (e.g. 'took my metformin') — I'll log it\n\n"
         "Plans & recommendations\n"
         "  - /plan — personalised weight-loss plan based on your profile\n"
         "  - /mealplan — 7-day meal plan within your calorie target\n"
@@ -190,6 +203,9 @@ async def _ask_medical(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         "Eating out\n"
         "  - /restaurant <place> — healthy choices and what to avoid at a specific restaurant\n"
         "  - Or just tell me (e.g. 'eating out at Pizza Hut')\n\n"
+        "Coaching\n"
+        "  - Ask me anything — I'll coach you based on your patterns and progress\n"
+        "  - Daily morning motivation at 8:30am, evening summary at 9pm\n\n"
         "Notifications\n"
         "  - /pause — pause daily check-in reminders\n"
         "  - /resume — turn them back on"

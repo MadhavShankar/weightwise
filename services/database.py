@@ -185,3 +185,139 @@ def get_users_inactive_48h() -> list:
         if last_logged is None or last_logged < cutoff:
             inactive.append(user)
     return inactive
+
+
+def log_exercise(
+    telegram_id: int,
+    description: str,
+    exercise_type: str,
+    duration_min: int,
+    calories_burned: int,
+) -> int:
+    client = _get_client()
+    result = client.table("exercise_logs").insert(
+        {
+            "telegram_id": telegram_id,
+            "description": description,
+            "exercise_type": exercise_type,
+            "duration_min": duration_min,
+            "calories_burned": calories_burned,
+            "logged_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).execute()
+    return result.data[0]["id"]
+
+
+def get_today_exercise_calories(telegram_id: int) -> int:
+    client = _get_client()
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    result = (
+        client.table("exercise_logs")
+        .select("calories_burned")
+        .eq("telegram_id", telegram_id)
+        .gte("logged_at", today_start.isoformat())
+        .execute()
+    )
+    return sum(row["calories_burned"] for row in result.data)
+
+
+def log_water(telegram_id: int, amount_ml: int) -> None:
+    client = _get_client()
+    client.table("water_logs").insert(
+        {
+            "telegram_id": telegram_id,
+            "amount_ml": amount_ml,
+            "logged_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).execute()
+
+
+def get_today_water_ml(telegram_id: int) -> int:
+    client = _get_client()
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    result = (
+        client.table("water_logs")
+        .select("amount_ml")
+        .eq("telegram_id", telegram_id)
+        .gte("logged_at", today_start.isoformat())
+        .execute()
+    )
+    return sum(row["amount_ml"] for row in result.data)
+
+
+def log_medication(telegram_id: int, medication_name: str) -> None:
+    client = _get_client()
+    client.table("medication_logs").insert(
+        {
+            "telegram_id": telegram_id,
+            "medication_name": medication_name,
+            "taken_at": datetime.now(timezone.utc).isoformat(),
+        }
+    ).execute()
+
+
+_STREAK_MILESTONES = {3, 7, 14, 30, 60, 90}
+
+
+def update_streak(telegram_id: int, hit_target: bool) -> dict:
+    client = _get_client()
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    user = get_user(telegram_id)
+    if not user:
+        return {"current": 0, "longest": 0, "milestone": None}
+
+    current = user.get("current_streak") or 0
+    longest = user.get("longest_streak") or 0
+    last_updated = user.get("streak_last_updated")
+
+    if not hit_target:
+        client.table("users").update(
+            {"current_streak": 0, "streak_last_updated": today}
+        ).eq("telegram_id", telegram_id).execute()
+        return {"current": 0, "longest": longest, "milestone": None}
+
+    if last_updated == today:
+        return {"current": current, "longest": longest, "milestone": None}
+
+    current += 1
+    longest = max(longest, current)
+    milestone = current if current in _STREAK_MILESTONES else None
+
+    client.table("users").update(
+        {
+            "current_streak": current,
+            "longest_streak": longest,
+            "streak_last_updated": today,
+        }
+    ).eq("telegram_id", telegram_id).execute()
+
+    return {"current": current, "longest": longest, "milestone": milestone}
+
+
+def get_weekly_meals(telegram_id: int, days: int = 7) -> list:
+    client = _get_client()
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    result = (
+        client.table("meal_logs")
+        .select("description, calories, meal_data, logged_at")
+        .eq("telegram_id", telegram_id)
+        .gte("logged_at", since.isoformat())
+        .order("logged_at", desc=False)
+        .execute()
+    )
+    return result.data
+
+
+def save_pattern_summary(telegram_id: int, summary: str) -> None:
+    client = _get_client()
+    client.table("users").update(
+        {
+            "eating_pattern_summary": summary,
+            "last_pattern_update": datetime.now(timezone.utc).isoformat(),
+        }
+    ).eq("telegram_id", telegram_id).execute()

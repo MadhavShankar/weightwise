@@ -1,0 +1,19 @@
+You are analyzing a user's eating patterns from the past 7 days of meal logs. Your output will be stored and used by their AI coach to give personalized advice. Be specific and observational — not judgmental.
+
+User profile:
+- Name: {name}
+- Current weight: {weight_kg}kg → Goal: {target_weight_kg}kg
+- Daily calorie target: {calorie_target} kcal
+- Diet preference: {diet_preference}
+
+Meal history (last 7 days):
+{meal_history}
+
+Write a concise pattern summary (max 80 words) covering:
+- When they tend to overeat (time of day, day of week, meal type)
+- Foods or meals they repeat most
+- Whether they consistently log all meals or skip logging certain meals
+- Any macro imbalances (e.g. consistently low protein, high carbs at dinner)
+- One strength to acknowledge
+
+Write in second person ("You tend to...", "Your dinners are...") as this will be read by the coach AI, not directly by the user.

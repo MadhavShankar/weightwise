@@ -41,6 +41,8 @@ def analyze_meal_photo(image_bytes: bytes, user_profile: dict) -> str:
         weight_kg=user_profile.get("weight_kg", 0),
         target_weight_kg=user_profile.get("target_weight_kg", 0),
         diet_preference=user_profile.get("diet_preference", "none"),
+        current_streak=user_profile.get("current_streak", 0),
+        eating_pattern_summary=user_profile.get("eating_pattern_summary") or "No patterns recorded yet.",
     )
     model = _get_model(system)
     response = model.generate_content(
@@ -61,6 +63,8 @@ def analyze_meal_text(description: str, user_profile: dict) -> str:
         weight_kg=user_profile.get("weight_kg", 0),
         target_weight_kg=user_profile.get("target_weight_kg", 0),
         diet_preference=user_profile.get("diet_preference", "none"),
+        current_streak=user_profile.get("current_streak", 0),
+        eating_pattern_summary=user_profile.get("eating_pattern_summary") or "No patterns recorded yet.",
     )
     model = _get_model(system)
     response = model.generate_content(
@@ -95,6 +99,8 @@ def generate_weight_plan(user_profile: dict) -> str:
         diet_preference=user_profile.get("diet_preference", "none"),
         medical_conditions=user_profile.get("medical_conditions", "none"),
         calorie_target=user_profile.get("calorie_target", 0),
+        current_streak=user_profile.get("current_streak", 0),
+        eating_pattern_summary=user_profile.get("eating_pattern_summary") or "No patterns recorded yet.",
     )
     model = _get_model(system)
     response = model.generate_content(
@@ -155,17 +161,114 @@ def correct_meal_analysis(original_analysis: str, correction: str, user_profile:
     return response.text
 
 
-def chat_response(user_message: str, user_profile: dict) -> str:
-    system = (
-        f"You are a concise weight-loss coach. "
-        f"Client: {user_profile.get('name')}, "
-        f"daily target {user_profile.get('calorie_target')} kcal, "
-        f"goal {user_profile.get('target_weight_kg')} kg. "
-        "Reply in 2-3 sentences max. Be specific — no generic advice."
+def coach_chat(user_message: str, user_profile: dict) -> str:
+    system = _load_prompt("coach_chat.txt").format(
+        name=user_profile.get("name", "User"),
+        weight_kg=user_profile.get("weight_kg", 0),
+        target_weight_kg=user_profile.get("target_weight_kg", 0),
+        calorie_target=user_profile.get("calorie_target", 2000),
+        today_calories=user_profile.get("today_calories", 0),
+        exercise_calories=user_profile.get("exercise_calories", 0),
+        water_ml=user_profile.get("water_ml", 0),
+        current_streak=user_profile.get("current_streak", 0),
+        medical_conditions=user_profile.get("medical_conditions", "none"),
+        eating_pattern_summary=user_profile.get("eating_pattern_summary") or "No patterns recorded yet.",
     )
     model = _get_model(system)
     response = model.generate_content(
         contents=user_message,
+        generation_config={"max_output_tokens": 400},
+    )
+    return response.text
+
+
+def analyze_exercise(description: str, user_profile: dict) -> str:
+    system = _load_prompt("exercise_log.txt").format(
+        name=user_profile.get("name", "User"),
+        weight_kg=user_profile.get("weight_kg", 70),
+    )
+    model = _get_model(system)
+    response = model.generate_content(
+        contents=f"Log this exercise: {description}",
         generation_config={"max_output_tokens": 200},
+    )
+    return response.text
+
+
+def analyze_water(description: str) -> int:
+    system = _load_prompt("water_log.txt")
+    model = _get_model(system)
+    response = model.generate_content(
+        contents=description,
+        generation_config={"max_output_tokens": 20},
+    )
+    try:
+        return int(response.text.strip())
+    except ValueError:
+        return 250
+
+
+def generate_morning_motivation(user_profile: dict, yesterday_stats: dict) -> str:
+    system = _load_prompt("coach_morning.txt").format(
+        name=user_profile.get("name", "User"),
+        weight_kg=user_profile.get("weight_kg", 0),
+        target_weight_kg=user_profile.get("target_weight_kg", 0),
+        calorie_target=user_profile.get("calorie_target", 2000),
+        current_streak=user_profile.get("current_streak", 0),
+        longest_streak=user_profile.get("longest_streak", 0),
+        eating_pattern_summary=user_profile.get("eating_pattern_summary") or "No patterns recorded yet.",
+        yesterday_calories=yesterday_stats.get("calories", 0),
+        yesterday_water_ml=yesterday_stats.get("water_ml", 0),
+        yesterday_exercise_calories=yesterday_stats.get("exercise_calories", 0),
+    )
+    model = _get_model(system)
+    response = model.generate_content(
+        contents="Give me my morning motivation.",
+        generation_config={"max_output_tokens": 300},
+    )
+    return response.text
+
+
+def generate_evening_summary(user_profile: dict, daily_stats: dict) -> str:
+    system = _load_prompt("coach_evening.txt").format(
+        name=user_profile.get("name", "User"),
+        weight_kg=user_profile.get("weight_kg", 0),
+        target_weight_kg=user_profile.get("target_weight_kg", 0),
+        calorie_target=user_profile.get("calorie_target", 2000),
+        current_streak=daily_stats.get("current_streak", 0),
+        longest_streak=user_profile.get("longest_streak", 0),
+        milestone=daily_stats.get("milestone") or "",
+        eating_pattern_summary=user_profile.get("eating_pattern_summary") or "No patterns recorded yet.",
+        calories_in=daily_stats.get("calories_in", 0),
+        exercise_calories=daily_stats.get("exercise_calories", 0),
+        net_calories=daily_stats.get("net_calories", 0),
+        water_ml=daily_stats.get("water_ml", 0),
+        meal_count=daily_stats.get("meal_count", 0),
+    )
+    model = _get_model(system)
+    response = model.generate_content(
+        contents="Give me my evening summary.",
+        generation_config={"max_output_tokens": 400},
+    )
+    return response.text
+
+
+def analyze_eating_patterns(meal_history: list, user_profile: dict) -> str:
+    meal_text = "\n".join(
+        f"{row.get('logged_at', '')[:16]} — {row.get('description', '')} ({row.get('calories', 0)} kcal)"
+        for row in meal_history
+    )
+    system = _load_prompt("pattern_analysis.txt").format(
+        name=user_profile.get("name", "User"),
+        weight_kg=user_profile.get("weight_kg", 0),
+        target_weight_kg=user_profile.get("target_weight_kg", 0),
+        calorie_target=user_profile.get("calorie_target", 2000),
+        diet_preference=user_profile.get("diet_preference", "none"),
+        meal_history=meal_text or "No meals logged in the past 7 days.",
+    )
+    model = _get_model(system)
+    response = model.generate_content(
+        contents="Analyze my eating patterns.",
+        generation_config={"max_output_tokens": 300},
     )
     return response.text
