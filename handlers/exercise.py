@@ -50,30 +50,17 @@ def _parse_days(text: str) -> list[int]:
 
 def _routine_adherence(routine: dict, name: str, exercise_type: str) -> str:
     preferred_days_str = routine.get("preferred_days", "")
-    freq = routine.get("frequency_per_week", 0)
     routine_type = routine.get("exercise_type", "workout")
 
     day_indices = _parse_days(preferred_days_str)
     today_idx = datetime.now(_IST).weekday()
 
-    if not day_indices:
-        return (
-            f"On track with your {routine_type} routine, {name}. "
-            f"That's {freq}x/week — keep the discipline."
-        )
-
-    if today_idx in day_indices:
-        return (
-            f"Right on schedule, {name} — today is one of your {routine_type} days. "
-            f"Great that you got it done."
-        )
+    if not day_indices or today_idx in day_indices:
+        return f"Good — on schedule."
 
     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     scheduled = ", ".join(day_names[d] for d in day_indices)
-    return (
-        f"Bonus session, {name} — today isn't one of your scheduled {routine_type} days "
-        f"({scheduled}). Extra work like this is what separates good from great."
-    )
+    return f"Bonus session, {name}. Your scheduled days are {scheduled} — extra work counts."
 
 
 async def exercise_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -118,14 +105,7 @@ async def exercise_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         adherence = _routine_adherence(routine, user_profile.get("name", ""), exercise_type)
         await update.message.reply_text(f"{response}\n\n{adherence}")
     else:
-        context.user_data["pending_state"] = {
-            "type": "exercise_routine",
-            "exercise_type": exercise_type,
-            "step": "ask_regular",
-        }
-        await update.message.reply_text(
-            f"{response}\n\nIs {exercise_type} part of your regular routine? (yes / no)"
-        )
+        await update.message.reply_text(response)
 
     logger.info(
         "Logged exercise for user %d: %s, %d min, %d kcal burned",

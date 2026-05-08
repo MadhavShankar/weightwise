@@ -14,10 +14,10 @@ from telegram.ext import (
 )
 
 from handlers.coach import coach_handler
-from handlers.exercise import exercise_handler, handle_exercise_routine_state
+from handlers.exercise import exercise_handler
 from handlers.meal_log import log_handler, log_command_handler, photo_meal_handler, meal_correction_handler
 from handlers.meal_plan import meal_plan_handler
-from handlers.medication import medication_handler, handle_med_schedule_state
+from handlers.medication import medication_handler
 from handlers.plan import plan_handler
 from handlers.report import report_handler
 from handlers.restaurant import restaurant_handler
@@ -60,23 +60,10 @@ async def photo_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await photo_meal_handler(update, context)
 
 
-async def _dispatch_pending_state(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    state = context.user_data.get("pending_state", {})
-    state_type = state.get("type")
-    if state_type == "med_schedule":
-        await handle_med_schedule_state(update, context, state)
-    elif state_type == "exercise_routine":
-        await handle_exercise_routine_state(update, context, state)
-    else:
-        context.user_data.pop("pending_state", None)
-
-
 async def smart_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = update.message.text or ""
 
-    if context.user_data.get("pending_state"):
-        await _dispatch_pending_state(update, context)
-    elif context.user_data.get("last_meal_id"):
+    if context.user_data.get("last_meal_id"):
         await meal_correction_handler(update, context)
     elif _WEIGHT_RE.search(text):
         await weight_handler(update, context)

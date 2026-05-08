@@ -64,7 +64,7 @@ def _adherence_message(schedule: dict, name: str) -> str:
 
     hours = _parse_hours(schedule_times)
     if not hours:
-        return f"Logged {med_name} — keeping consistent, {name}."
+        return f"Noted — {med_name} logged."
 
     now_ist = datetime.now(_IST)
     current_hour = now_ist.hour
@@ -73,19 +73,16 @@ def _adherence_message(schedule: dict, name: str) -> str:
     closest_diff, closest_hour = diffs[0]
 
     if closest_diff <= 1:
-        return f"Right on time with your {med_name}, {name}. Keep that consistency."
+        return f"Good — {med_name} right on time."
 
     if closest_diff <= 3:
-        return (
-            f"{name}, your {med_name} was due around {_fmt_hour(closest_hour)} — "
-            f"you're a little late. Take it now and stay on track."
-        )
+        return f"{name}, you're late on your {med_name}. Take it now."
 
     future = [h for h in hours if h > current_hour]
     if future:
-        return f"Logged {med_name}, {name}. Next dose at {_fmt_hour(min(future))}."
+        return f"Noted — {med_name} logged. Next dose at {_fmt_hour(min(future))}."
 
-    return f"All {med_name} doses done for today, {name}. Solid consistency."
+    return f"All {med_name} doses done today. Good."
 
 
 async def medication_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -106,14 +103,7 @@ async def medication_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if schedule:
         await update.message.reply_text(_adherence_message(schedule, name))
     else:
-        context.user_data["pending_state"] = {
-            "type": "med_schedule",
-            "name": med_name,
-            "step": "ask_regular",
-        }
-        await update.message.reply_text(
-            f"Logged {med_name}. Is this something you take on a regular schedule? (yes / no)"
-        )
+        await update.message.reply_text(f"Noted — {med_name} logged.")
 
     logger.info("Logged medication for user %d: %s", telegram_id, med_name)
 
