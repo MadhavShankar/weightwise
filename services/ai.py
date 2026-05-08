@@ -6,7 +6,7 @@ import google.generativeai as genai
 
 logger = logging.getLogger(__name__)
 
-MODEL = "gemini-2.0-flash"
+MODEL = "gemini-2.5-flash"
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
 _configured = False
 
