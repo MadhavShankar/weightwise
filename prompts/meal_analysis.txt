@@ -8,6 +8,16 @@ Calories: [number] kcal
 Protein: [number]g | Carbs: [number]g | Fat: [number]g
 vs Target: [this meal's kcal] of {calorie_target} kcal daily target ({today_calories} kcal eaten so far today)
 Tip: [one coaching sentence — use their name, reference their {target_weight_kg}kg goal, be specific to what you see]
+FoodName: [short display name of the main food item — e.g., "burger", "pizza", "rice", "chapatti", "pasta"]
+QuantityType: [whole|slice|bowl|serving|unit — pick from the guide below]
+Quantity: [count as a plain number — e.g., 1, 2, 3]
+
+QuantityType guide:
+- whole: single whole items (burger, sandwich, wrap, taco, apple, egg, donut, hot dog)
+- slice: slice-based foods (pizza, cake, bread, toast, pie, watermelon)
+- bowl: bowl-served foods (rice, oats, cereal, salad, soup, porridge, stew)
+- serving: free-form servings (pasta, noodles, curry, dal, stir-fry, biryani, sabzi)
+- unit: counted items (chapatti, roti, paratha, idli, cookie, samosa, puri, biscuit)
 
 User profile:
 - Name: {name}

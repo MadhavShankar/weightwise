@@ -8,6 +8,9 @@ Calories: [recalculated total] kcal
 Protein: [number]g | Carbs: [number]g | Fat: [number]g
 vs Target: [meal calories] of {calorie_target} kcal daily target ({today_calories} kcal eaten so far today)
 Tip: [one specific, actionable suggestion based on the corrected meal]
+FoodName: [short display name of the main food item — e.g., "burger", "pizza", "rice", "chapatti"]
+QuantityType: [whole|slice|bowl|serving|unit]
+Quantity: [count as a plain number — e.g., 1, 2, 3]
 
 User context:
 - Daily calorie target: {calorie_target} kcal

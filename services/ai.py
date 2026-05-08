@@ -263,6 +263,35 @@ def extract_medication_name(text: str) -> str:
     return response.text.strip().lower()
 
 
+def generate_weekly_summary(user_profile: dict, weekly_stats: dict) -> str:
+    weight_change = weekly_stats.get("weight_change", 0.0)
+    weight_change_str = f"+{weight_change:.1f}" if weight_change > 0 else f"{weight_change:.1f}"
+    system = _load_prompt("weekly_summary.txt").format(
+        name=user_profile.get("name", "User"),
+        calorie_target=user_profile.get("calorie_target", 2000),
+        avg_calories=weekly_stats.get("avg_calories", 0),
+        days_on_target=weekly_stats.get("days_on_target", 0),
+        avg_water_ml=weekly_stats.get("avg_water_ml", 0),
+        water_goal_ml=weekly_stats.get("water_goal_ml", 2500),
+        water_days_met=weekly_stats.get("water_days_met", 0),
+        water_days_missed=weekly_stats.get("water_days_missed", 7),
+        exercise_days=weekly_stats.get("exercise_days", 0),
+        total_exercise_calories=weekly_stats.get("total_exercise_calories", 0),
+        weight_start_kg=weekly_stats.get("weight_start_kg", user_profile.get("weight_kg", 0)),
+        weight_end_kg=weekly_stats.get("weight_end_kg", user_profile.get("weight_kg", 0)),
+        weight_change=weight_change_str,
+        target_weight_kg=user_profile.get("target_weight_kg", 0),
+        current_streak=user_profile.get("current_streak", 0),
+        eating_pattern_summary=user_profile.get("eating_pattern_summary") or "No patterns recorded yet.",
+    )
+    model = _get_model(system)
+    response = model.generate_content(
+        contents="Give me my weekly summary.",
+        generation_config={"max_output_tokens": 500},
+    )
+    return response.text
+
+
 def analyze_eating_patterns(meal_history: list, user_profile: dict) -> str:
     meal_text = "\n".join(
         f"{row.get('logged_at', '')[:16]} — {row.get('description', '')} ({row.get('calories', 0)} kcal)"

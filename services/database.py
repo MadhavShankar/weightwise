@@ -440,6 +440,59 @@ def has_exercise_today(telegram_id: int) -> bool:
     return bool(result.data)
 
 
+def get_weekly_calorie_stats(telegram_id: int) -> dict:
+    client = _get_client()
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    result = (
+        client.table("meal_logs")
+        .select("calories, logged_at")
+        .eq("telegram_id", telegram_id)
+        .gte("logged_at", since.isoformat())
+        .execute()
+    )
+    daily: dict[str, int] = {}
+    for row in result.data:
+        day = row["logged_at"][:10]
+        daily[day] = daily.get(day, 0) + row["calories"]
+    avg = sum(daily.values()) // 7 if daily else 0
+    return {"daily": daily, "avg_calories": avg}
+
+
+def get_weekly_water_stats(telegram_id: int) -> dict:
+    client = _get_client()
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    result = (
+        client.table("water_logs")
+        .select("amount_ml, logged_at")
+        .eq("telegram_id", telegram_id)
+        .gte("logged_at", since.isoformat())
+        .execute()
+    )
+    daily: dict[str, int] = {}
+    for row in result.data:
+        day = row["logged_at"][:10]
+        daily[day] = daily.get(day, 0) + row["amount_ml"]
+    avg = sum(daily.values()) // 7 if daily else 0
+    return {"daily": daily, "avg_ml": avg}
+
+
+def get_weekly_exercise_stats(telegram_id: int) -> dict:
+    client = _get_client()
+    since = datetime.now(timezone.utc) - timedelta(days=7)
+    result = (
+        client.table("exercise_logs")
+        .select("calories_burned, logged_at")
+        .eq("telegram_id", telegram_id)
+        .gte("logged_at", since.isoformat())
+        .execute()
+    )
+    daily: dict[str, int] = {}
+    for row in result.data:
+        day = row["logged_at"][:10]
+        daily[day] = daily.get(day, 0) + row["calories_burned"]
+    return {"exercise_days": len(daily), "total_exercise_calories": sum(daily.values())}
+
+
 def get_days_since_weight_log(telegram_id: int) -> int | None:
     client = _get_client()
     result = (

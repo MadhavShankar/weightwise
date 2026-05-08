@@ -13,7 +13,8 @@ User profile:
 
 STEP 1 — Determine intent:
 - MEAL: The message describes food they ate (e.g. "had 2 eggs", "ate a burger", "just had lunch")
-- CHAT: A question, update, motivation request, venting, or anything not a food log
+- NO_CHANGE: The user says nothing new to log (e.g. "no changes", "same as before", "nothing new", "all good", "no updates", "nothing to log", "nothing different", "no change today")
+- CHAT: A question, update, motivation request, venting, or anything not a food log or no_change
 
 STEP 2 — Respond:
 
@@ -25,6 +26,13 @@ Calories: [number] kcal
 Protein: [number]g | Carbs: [number]g | Fat: [number]g
 vs Target: [this meal] of {calorie_target} kcal daily target ({today_calories} kcal eaten so far)
 Tip: [one line — real trainer voice, specific to this meal and their goal]
+FoodName: [short display name of the main food item — e.g., "burger", "pizza", "rice", "chapatti"]
+QuantityType: [whole|slice|bowl|serving|unit — pick from: whole=single whole items like burger/sandwich/egg/apple; slice=pizza/cake/bread/toast; bowl=rice/oats/soup/salad; serving=pasta/noodles/curry/dal/biryani; unit=chapatti/roti/paratha/idli/cookie/samosa]
+Quantity: [count as a plain number — e.g., 1, 2, 3]
+
+If NO_CHANGE, respond EXACTLY like this:
+INTENT: no_change
+Noted.
 
 If CHAT, respond EXACTLY like this:
 INTENT: chat

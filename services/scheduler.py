@@ -62,7 +62,25 @@ def _parse_routine_days(preferred_days: str) -> list[int]:
     return sorted({v for k, v in _DAY_MAP.items() if k in low})
 
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _get_water_goal_ml(user_profile: dict) -> int:
+    """Daily water goal in ml from weight + activity. Falls back to 2500ml."""
+    stored = user_profile.get("water_goal_ml")
+    if stored:
+        return int(stored)
+    weight = user_profile.get("weight_kg") or 0
+    if not weight:
+        return 2500
+    activity = (user_profile.get("activity_level") or "").lower()
+    if any(w in activity for w in ("very active", "highly active", "athlete")):
+        ml_per_kg = 40
+    elif any(w in activity for w in ("active", "moderate")):
+        ml_per_kg = 35
+    else:
+        ml_per_kg = 30
+    return int(weight * ml_per_kg)
+
 
 def _get_yesterday_stats(telegram_id: int) -> dict:
     client = database._get_client()
@@ -122,21 +140,31 @@ async def _morning_motivation(bot) -> None:
             logger.exception("morning_motivation failed for telegram_id=%s", telegram_id)
 
 
-async def _midday_water_nudge(bot) -> None:
+async def _water_nudge(bot) -> None:
+    """Fires 4× daily. Skips users who have already met their water goal."""
     users = database.get_all_onboarded_users()
-    logger.info("midday_water_nudge: checking %d users", len(users))
+    logger.info("water_nudge: checking %d users", len(users))
     for user in users:
         telegram_id = user["telegram_id"]
         try:
+            user_profile = database.get_user(telegram_id)
+            if not user_profile:
+                continue
             water_ml = database.get_today_water_ml(telegram_id)
-            if water_ml < 500:
-                name = user.get("name", "")
-                await bot.send_message(
-                    chat_id=telegram_id,
-                    text=f"Hey {name}, you've only had {water_ml}ml of water so far today. Grab a glass now — hydration keeps hunger in check.",
-                )
+            water_goal = _get_water_goal_ml(user_profile)
+            if water_ml >= water_goal:
+                continue
+            name = user_profile.get("name", "")
+            remaining = water_goal - water_ml
+            await bot.send_message(
+                chat_id=telegram_id,
+                text=(
+                    f"{name}, water check: {water_ml}ml so far today, goal is {water_goal}ml. "
+                    f"{remaining}ml still to go — grab a glass now."
+                ),
+            )
         except Exception:
-            logger.exception("midday_water_nudge failed for telegram_id=%s", telegram_id)
+            logger.exception("water_nudge failed for telegram_id=%s", telegram_id)
 
 
 async def _medication_routine_nudge(bot) -> None:
@@ -283,9 +311,56 @@ async def _weekly_pattern_analysis(bot) -> None:
             meal_history = database.get_weekly_meals(telegram_id)
             if not meal_history:
                 continue
-            summary = ai.analyze_eating_patterns(meal_history, user_profile)
-            database.save_pattern_summary(telegram_id, summary)
-            logger.info("Pattern summary updated for user %d", telegram_id)
+
+            # Update eating pattern summary in DB
+            pattern_summary = ai.analyze_eating_patterns(meal_history, user_profile)
+            database.save_pattern_summary(telegram_id, pattern_summary)
+
+            # Reload profile with the freshly saved pattern
+            user_profile = database.get_user(telegram_id)
+
+            # Aggregate weekly stats for the user-facing message
+            calorie_stats = database.get_weekly_calorie_stats(telegram_id)
+            water_stats = database.get_weekly_water_stats(telegram_id)
+            exercise_stats = database.get_weekly_exercise_stats(telegram_id)
+            weight_history = database.get_weight_history(telegram_id, days=7)
+
+            calorie_target = user_profile.get("calorie_target", 2000)
+            days_on_target = sum(
+                1 for cal in calorie_stats["daily"].values() if cal <= calorie_target
+            )
+
+            water_goal_ml = _get_water_goal_ml(user_profile)
+            water_days_met = sum(
+                1 for ml in water_stats["daily"].values() if ml >= water_goal_ml
+            )
+
+            weight_start = (
+                weight_history[0]["weight_kg"] if weight_history
+                else user_profile.get("weight_kg", 0)
+            )
+            weight_end = (
+                weight_history[-1]["weight_kg"] if weight_history
+                else user_profile.get("weight_kg", 0)
+            )
+
+            weekly_stats = {
+                "avg_calories": calorie_stats["avg_calories"],
+                "days_on_target": days_on_target,
+                "avg_water_ml": water_stats["avg_ml"],
+                "water_goal_ml": water_goal_ml,
+                "water_days_met": water_days_met,
+                "water_days_missed": 7 - water_days_met,
+                "exercise_days": exercise_stats["exercise_days"],
+                "total_exercise_calories": exercise_stats["total_exercise_calories"],
+                "weight_start_kg": weight_start,
+                "weight_end_kg": weight_end,
+                "weight_change": round(weight_end - weight_start, 1),
+            }
+
+            message = ai.generate_weekly_summary(user_profile, weekly_stats)
+            await bot.send_message(chat_id=telegram_id, text=message)
+            logger.info("Weekly summary sent to user %d", telegram_id)
         except Exception:
             logger.exception("weekly_pattern_analysis failed for telegram_id=%s", telegram_id)
 
@@ -319,12 +394,13 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
         id="morning_motivation",
     )
 
-    # 1pm IST = 07:30 UTC
+    # Water nudges: 8am, 12pm, 4pm, 8pm IST = 2:30, 6:30, 10:30, 14:30 UTC
+    # Skips users who have already met their daily goal
     _scheduler.add_job(
-        _midday_water_nudge,
-        CronTrigger(hour=7, minute=30, timezone="UTC"),
+        _water_nudge,
+        CronTrigger(hour="2,6,10,14", minute=30, timezone="UTC"),
         args=[bot],
-        id="midday_water_nudge",
+        id="water_nudge",
     )
 
     # Medication nudge — 3 windows covering most Indian med schedules:
@@ -371,9 +447,10 @@ def setup_scheduler(bot) -> AsyncIOScheduler:
 
     _scheduler.start()
     logger.info(
-        "Scheduler started — 7 jobs: morning@03:00, water@07:30, "
+        "Scheduler started — 7 jobs: morning@03:00, "
+        "water@02:30/06:30/10:30/14:30, "
         "medication@02:00/08:00/15:00, exercise_routine@13:00, "
-        "evening@15:30, patterns@Sun14:30, re_engagement@13:30 UTC"
+        "evening@15:30, weekly_summary@Sun14:30, re_engagement@13:30 UTC"
     )
     return _scheduler
 
