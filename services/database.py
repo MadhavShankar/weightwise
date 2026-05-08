@@ -24,10 +24,10 @@ def get_user(telegram_id: int) -> dict | None:
         client.table("users")
         .select("*")
         .eq("telegram_id", telegram_id)
-        .maybe_single()
+        .limit(1)
         .execute()
     )
-    return result.data
+    return result.data[0] if result.data else None
 
 
 def create_user(telegram_id: int, name: str) -> dict:
@@ -122,10 +122,9 @@ def get_last_report_summary(telegram_id: int) -> str | None:
         .eq("telegram_id", telegram_id)
         .order("created_at", desc=True)
         .limit(1)
-        .maybe_single()
         .execute()
     )
-    return result.data["summary"] if result.data else None
+    return result.data[0]["summary"] if result.data else None
 
 
 def get_all_onboarded_users() -> list:
@@ -162,12 +161,11 @@ def get_last_meal_logged_at(telegram_id: int) -> datetime | None:
         .eq("telegram_id", telegram_id)
         .order("logged_at", desc=True)
         .limit(1)
-        .maybe_single()
         .execute()
     )
     if not result.data:
         return None
-    return datetime.fromisoformat(result.data["logged_at"])
+    return datetime.fromisoformat(result.data[0]["logged_at"])
 
 
 def get_users_inactive_48h() -> list:
