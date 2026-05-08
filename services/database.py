@@ -321,3 +321,84 @@ def save_pattern_summary(telegram_id: int, summary: str) -> None:
             "last_pattern_update": datetime.now(timezone.utc).isoformat(),
         }
     ).eq("telegram_id", telegram_id).execute()
+
+
+def get_medication_schedule(telegram_id: int, medication_name: str) -> dict | None:
+    client = _get_client()
+    result = (
+        client.table("medication_schedules")
+        .select("*")
+        .eq("telegram_id", telegram_id)
+        .ilike("medication_name", medication_name)
+        .eq("is_active", True)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def save_medication_schedule(
+    telegram_id: int,
+    medication_name: str,
+    frequency: str,
+    schedule_times: str,
+) -> None:
+    client = _get_client()
+    client.table("medication_schedules").insert(
+        {
+            "telegram_id": telegram_id,
+            "medication_name": medication_name,
+            "frequency": frequency,
+            "schedule_times": schedule_times,
+        }
+    ).execute()
+
+
+def get_exercise_routine(telegram_id: int) -> dict | None:
+    client = _get_client()
+    result = (
+        client.table("exercise_routines")
+        .select("*")
+        .eq("telegram_id", telegram_id)
+        .eq("is_active", True)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+def save_exercise_routine(
+    telegram_id: int,
+    exercise_type: str,
+    frequency_per_week: int,
+    preferred_days: str,
+    notes: str = "",
+) -> None:
+    client = _get_client()
+    client.table("exercise_routines").insert(
+        {
+            "telegram_id": telegram_id,
+            "exercise_type": exercise_type,
+            "frequency_per_week": frequency_per_week,
+            "preferred_days": preferred_days,
+            "notes": notes,
+        }
+    ).execute()
+
+
+def get_days_since_weight_log(telegram_id: int) -> int | None:
+    client = _get_client()
+    result = (
+        client.table("weight_logs")
+        .select("logged_at")
+        .eq("telegram_id", telegram_id)
+        .order("logged_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        return None
+    last = datetime.fromisoformat(result.data[0]["logged_at"])
+    delta = datetime.now(timezone.utc) - last
+    return delta.days

@@ -1,0 +1,9 @@
+Extract the medication name from the user's message. Return ONLY the medication name, lowercase. No other text.
+
+Examples:
+"took my metformin" → metformin
+"had my morning pill" → pill
+"took 500mg aspirin" → aspirin
+"took my blood pressure medication" → blood pressure medication
+"had my insulin shot" → insulin
+"took my thyroid tablet" → thyroid tablet

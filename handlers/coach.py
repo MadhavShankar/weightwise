@@ -12,6 +12,24 @@ _INTENT_RE = re.compile(r"^INTENT:\s*(meal|chat)", re.IGNORECASE | re.MULTILINE)
 _CALORIES_RE = re.compile(r"Calories:\s*(\d+)")
 
 
+def _get_proactive_nudge(telegram_id: int, user_profile: dict, context) -> str | None:
+    if context.user_data.get("profile_nudge_sent"):
+        return None
+
+    days_since_weight = database.get_days_since_weight_log(telegram_id)
+    name = user_profile.get("name", "")
+
+    if days_since_weight is None:
+        context.user_data["profile_nudge_sent"] = True
+        return f"By the way — I don't have a weight log for you yet. Use /weight to log it so I can track your progress."
+
+    if days_since_weight >= 7:
+        context.user_data["profile_nudge_sent"] = True
+        return f"Quick note, {name}: your last weight log was {days_since_weight} days ago. Use /weight to update it — weekly weigh-ins make a real difference to tracking."
+
+    return None
+
+
 async def coach_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     telegram_id = update.effective_user.id
     user_profile = database.get_user(telegram_id)
@@ -61,3 +79,7 @@ async def coach_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         clean_response = _INTENT_RE.sub("", response).strip()
         await update.message.reply_text(clean_response)
         logger.info("Coach chat for user %d", telegram_id)
+
+    nudge = _get_proactive_nudge(telegram_id, user_profile, context)
+    if nudge:
+        await update.message.reply_text(nudge)

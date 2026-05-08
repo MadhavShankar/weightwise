@@ -253,6 +253,16 @@ def generate_evening_summary(user_profile: dict, daily_stats: dict) -> str:
     return response.text
 
 
+def extract_medication_name(text: str) -> str:
+    system = _load_prompt("medication_extract.txt")
+    model = _get_model(system)
+    response = model.generate_content(
+        contents=text,
+        generation_config={"max_output_tokens": 15},
+    )
+    return response.text.strip().lower()
+
+
 def analyze_eating_patterns(meal_history: list, user_profile: dict) -> str:
     meal_text = "\n".join(
         f"{row.get('logged_at', '')[:16]} — {row.get('description', '')} ({row.get('calories', 0)} kcal)"
