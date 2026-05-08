@@ -387,6 +387,59 @@ def save_exercise_routine(
     ).execute()
 
 
+def get_all_medication_schedules() -> list:
+    client = _get_client()
+    result = (
+        client.table("medication_schedules")
+        .select("*")
+        .eq("is_active", True)
+        .execute()
+    )
+    return result.data
+
+
+def get_recent_medication_log(telegram_id: int, medication_name: str, hours: int = 2) -> bool:
+    client = _get_client()
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    result = (
+        client.table("medication_logs")
+        .select("id")
+        .eq("telegram_id", telegram_id)
+        .ilike("medication_name", f"%{medication_name}%")
+        .gte("taken_at", since.isoformat())
+        .limit(1)
+        .execute()
+    )
+    return bool(result.data)
+
+
+def get_all_exercise_routines() -> list:
+    client = _get_client()
+    result = (
+        client.table("exercise_routines")
+        .select("*")
+        .eq("is_active", True)
+        .execute()
+    )
+    return result.data
+
+
+def has_exercise_today(telegram_id: int) -> bool:
+    client = _get_client()
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    result = (
+        client.table("exercise_logs")
+        .select("id")
+        .eq("telegram_id", telegram_id)
+        .gte("logged_at", today_start.isoformat())
+        .limit(1)
+        .execute()
+    )
+    return bool(result.data)
+
+
 def get_days_since_weight_log(telegram_id: int) -> int | None:
     client = _get_client()
     result = (
